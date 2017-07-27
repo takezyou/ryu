@@ -37,33 +37,61 @@ class ExampleSwitch13(app_manager.RyuApp):
         parser = datapath.ofproto_parser
 
         # install the table-miss flow entry.
-        match = parser.OFPMatch()
-        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
-                                          ofproto.OFPCML_NO_BUFFER)]
-        self.add_flow(datapath, 0, match, actions)
+        # match = parser.OFPMatch()
+        # actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+        #                                   ofproto.OFPCML_NO_BUFFER)]
+        # self.add_flow(datapath, 0, match, actions)
 
         dpid = datapath.id
 
-        # s1 and s2 flow add
+        # s1 flow add
         if dpid == 1:
+            # host1 host3
             actions = [parser.OFPActionOutput(11)]
-            match = parser.OFPMatch(in_port=8, eth_dst="00:00:00:00:00:03")
+            match = parser.OFPMatch(eth_src="00:00:00:00:00:01",eth_dst="00:00:00:00:00:03")
+
+            self.add_flow(datapath, 2, match, actions)
+
+            actions = [parser.OFPActionOutput(13)]
+            match = parser.OFPMatch(eth_src="00:00:00:00:00:03", eth_dst="00:00:00:00:00:01")
+
+            self.add_flow(datapath, 2, match, actions)
+
+            #host2 host4
+            actions = [parser.OFPActionOutput(11)]
+            match = parser.OFPMatch(in_port=12, eth_dst="00:00:00:00:00:04")
 
             self.add_flow(datapath, 1, match, actions)
 
-            actions = [parser.OFPActionOutput(8)]
-            match = parser.OFPMatch(in_port=11, eth_dst="00:00:00:00:00:01")
+            actions = [parser.OFPActionOutput(12)]
+            match = parser.OFPMatch(in_port=11, eth_dst="00:00:00:00:00:02")
 
             self.add_flow(datapath, 1, match, actions)
 
+        # s2 flow add
         if  dpid == 2:
+            # host1 host3
             actions = [parser.OFPActionOutput(10)]
-            match = parser.OFPMatch(in_port=7, eth_dst="00:00:00:00:00:01")
+            match = parser.OFPMatch(eth_src="00:00:00:00:00:03", eth_dst="00:00:00:00:00:01")
+
+            self.add_flow(datapath, 2, match, actions)
+
+            actions = [parser.OFPActionOutput(12)]
+            match = parser.OFPMatch(eth_src="00:00:00:00:00:01", eth_dst="00:00:00:00:00:03")
+
+            self.add_flow(datapath, 2, match, actions)
+
+            #host2 host4
+            actions = [parser.OFPActionOutput(10)]
+            match = parser.OFPMatch(in_port=11, eth_dst="00:00:00:00:00:02")
 
             self.add_flow(datapath, 1, match, actions)
 
-            actions = [parser.OFPActionOutput(7)]
-            match = parser.OFPMatch(in_port=10, eth_dst="00:00:00:00:00:03")
+            actions = [parser.OFPActionOutput(11)]
+            match = parser.OFPMatch(in_port=10, eth_dst="00:00:00:00:00:04")
+
+            self.add_flow(datapath, 1, match, actions)
+
 
     def add_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
@@ -75,6 +103,7 @@ class ExampleSwitch13(app_manager.RyuApp):
         mod = parser.OFPFlowMod(datapath=datapath, priority=priority,
                                 match=match, instructions=inst)
         datapath.send_msg(mod)
+
 
     # @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     # def _packet_in_handler(self, ev):
