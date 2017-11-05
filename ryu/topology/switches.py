@@ -437,8 +437,7 @@ class LLDPPacket(object):
             message = '%(msg)s'
 
         @staticmethod
-        def lldp_packet(dpid, port_no, dl_addr, ttl, timestamp,
-                        vport_no=ofproto_v1_0.OFPP_NONE):
+        def lldp_packet(dpid, port_no, dl_addr, ttl, timestamp):
             pkt = packet.Packet()
 
             dst = lldp.LLDP_MAC_NEAREST_BRIDGE
@@ -518,7 +517,7 @@ class Switches(app_manager.RyuApp):
                event.EventHostAdd]
 
     DEFAULT_TTL = 120  # unused. ignored.
-    LLDP_PACKET_LEN = len(LLDPPacket.lldp_packet(0, 0, DONTCARE_STR, 0))
+    LLDP_PACKET_LEN = len(LLDPPacket.lldp_packet(0, 0, DONTCARE_STR, 0, 0))
 
     LLDP_SEND_GUARD = .05
     LLDP_SEND_PERIOD_PER_PORT = .9
