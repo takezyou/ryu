@@ -140,11 +140,12 @@ class lldp(packet_base.PacketBase):
     def _tlvs_len_valid(self):
         return len(self.tlvs) >= 4
 
-    # chassis id, port id, ttl and end
+    # chassis id, port id, ttl time and end
     def _tlvs_valid(self):
         return (self.tlvs[0].tlv_type == LLDP_TLV_CHASSIS_ID and
                 self.tlvs[1].tlv_type == LLDP_TLV_PORT_ID and
                 self.tlvs[2].tlv_type == LLDP_TLV_TTL and
+                self.tlvs[3].tlv_type == LLDP_TLV_SEND_TIME and
                 self.tlvs[-1].tlv_type == LLDP_TLV_END)
 
     @classmethod
