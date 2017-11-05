@@ -416,7 +416,7 @@ class LinkState(dict):
         return dst, rev_link_dst
 
 
-    class LLDPPacket(object):
+class LLDPPacket(object):
         # make a LLDP packet for link discovery.
 
         CHASSIS_ID_PREFIX = 'dpid:'
