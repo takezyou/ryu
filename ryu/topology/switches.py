@@ -417,80 +417,93 @@ class LinkState(dict):
 
 
 class LLDPPacket(object):
-    # make a LLDP packet for link discovery.
+        # make a LLDP packet for link discovery.
 
-    CHASSIS_ID_PREFIX = 'dpid:'
-    CHASSIS_ID_PREFIX_LEN = len(CHASSIS_ID_PREFIX)
-    CHASSIS_ID_FMT = CHASSIS_ID_PREFIX + '%s'
+        CHASSIS_ID_PREFIX = 'dpid:'
+        CHASSIS_ID_PREFIX_LEN = len(CHASSIS_ID_PREFIX)
+        CHASSIS_ID_FMT = CHASSIS_ID_PREFIX + '%s'
 
-    PORT_ID_STR = '!I'      # uint32_t
-    PORT_ID_SIZE = 4
+        PORT_ID_STR = '!I'      # uint32_t
+        PORT_ID_SIZE = 4
 
-    class LLDPUnknownFormat(RyuException):
-        message = '%(msg)s'
+        DOMAIN_ID_PREFIX = 'domain_id:'
+        DOMAIN_ID_PREFIX_LEN = len(DOMAIN_ID_PREFIX)
+        DOMAIN_ID_FMT = DOMAIN_ID_PREFIX + '%s'
 
-    @staticmethod
-    def lldp_packet(dpid, port_no, dl_addr, ttl):
-        pkt = packet.Packet()
+        VPORT_ID_STR = '!I'      # uint32_t
+        VPORT_ID_SIZE = 4
 
-        dst = lldp.LLDP_MAC_NEAREST_BRIDGE
-        src = dl_addr
-        ethertype = ETH_TYPE_LLDP
-        eth_pkt = ethernet.ethernet(dst, src, ethertype)
-        pkt.add_protocol(eth_pkt)
+        class LLDPUnknownFormat(RyuException):
+            message = '%(msg)s'
 
-        tlv_chassis_id = lldp.ChassisID(
-            subtype=lldp.ChassisID.SUB_LOCALLY_ASSIGNED,
-            chassis_id=(LLDPPacket.CHASSIS_ID_FMT %
-                        dpid_to_str(dpid)).encode('ascii'))
+        @staticmethod
+        def lldp_packet(dpid, port_no, dl_addr, ttl, timestamp):
+            pkt = packet.Packet()
 
-        tlv_port_id = lldp.PortID(subtype=lldp.PortID.SUB_PORT_COMPONENT,
-                                  port_id=struct.pack(
-                                      LLDPPacket.PORT_ID_STR,
-                                      port_no))
+            dst = lldp.LLDP_MAC_NEAREST_BRIDGE
+            src = dl_addr
+            ethertype = ETH_TYPE_LLDP
+            eth_pkt = ethernet.ethernet(dst, src, ethertype)
+            pkt.add_protocol(eth_pkt)
 
-        tlv_ttl = lldp.TTL(ttl=ttl)
-        tlv_end = lldp.End()
+            tlv_chassis_id = lldp.ChassisID(
+                subtype=lldp.ChassisID.SUB_LOCALLY_ASSIGNED,
+                chassis_id=LLDPPacket.CHASSIS_ID_FMT %
+                dpid_to_str(dpid))
 
-        tlvs = (tlv_chassis_id, tlv_port_id, tlv_ttl, tlv_end)
-        lldp_pkt = lldp.lldp(tlvs)
-        pkt.add_protocol(lldp_pkt)
+            tlv_port_id = lldp.PortID(subtype=lldp.PortID.SUB_PORT_COMPONENT,
+                                      port_id=struct.pack(
+                                          LLDPPacket.PORT_ID_STR,
+                                          port_no))
 
-        pkt.serialize()
-        return pkt.data
+            tlv_ttl = lldp.TTL(ttl=ttl)
+            tlv_timestamp = lldp.TimeStamp(timestamp=timestamp)
+            tlv_end = lldp.End()
 
-    @staticmethod
-    def lldp_parse(data):
-        pkt = packet.Packet(data)
-        i = iter(pkt)
-        eth_pkt = six.next(i)
-        assert type(eth_pkt) == ethernet.ethernet
+            tlvs = (tlv_chassis_id, tlv_port_id, tlv_ttl, tlv_timestamp, tlv_end)
+            lldp_pkt = lldp.lldp(tlvs)
+            pkt.add_protocol(lldp_pkt)
 
-        lldp_pkt = six.next(i)
-        if type(lldp_pkt) != lldp.lldp:
-            raise LLDPPacket.LLDPUnknownFormat()
+            pkt.serialize()
+            return pkt.data
 
-        tlv_chassis_id = lldp_pkt.tlvs[0]
-        if tlv_chassis_id.subtype != lldp.ChassisID.SUB_LOCALLY_ASSIGNED:
-            raise LLDPPacket.LLDPUnknownFormat(
-                msg='unknown chassis id subtype %d' % tlv_chassis_id.subtype)
-        chassis_id = tlv_chassis_id.chassis_id.decode('utf-8')
-        if not chassis_id.startswith(LLDPPacket.CHASSIS_ID_PREFIX):
-            raise LLDPPacket.LLDPUnknownFormat(
-                msg='unknown chassis id format %s' % chassis_id)
-        src_dpid = str_to_dpid(chassis_id[LLDPPacket.CHASSIS_ID_PREFIX_LEN:])
 
-        tlv_port_id = lldp_pkt.tlvs[1]
-        if tlv_port_id.subtype != lldp.PortID.SUB_PORT_COMPONENT:
-            raise LLDPPacket.LLDPUnknownFormat(
-                msg='unknown port id subtype %d' % tlv_port_id.subtype)
-        port_id = tlv_port_id.port_id
-        if len(port_id) != LLDPPacket.PORT_ID_SIZE:
-            raise LLDPPacket.LLDPUnknownFormat(
-                msg='unknown port id %d' % port_id)
-        (src_port_no, ) = struct.unpack(LLDPPacket.PORT_ID_STR, port_id)
+        @staticmethod
+        def lldp_parse(data):
+            pkt = packet.Packet(data)
+            i = iter(pkt)
+            eth_pkt = i.next()
+            assert type(eth_pkt) == ethernet.ethernet
 
-        return src_dpid, src_port_no
+            lldp_pkt = i.next()
+
+            if type(lldp_pkt) != lldp.lldp:
+                raise LLDPPacket.LLDPUnknownFormat()
+
+            tlv_chassis_id = lldp_pkt.tlvs[0]
+            if tlv_chassis_id.subtype != lldp.ChassisID.SUB_LOCALLY_ASSIGNED:
+                raise LLDPPacket.LLDPUnknownFormat(
+                    msg='unknown chassis id subtype %d' % tlv_chassis_id.subtype)
+            chassis_id = tlv_chassis_id.chassis_id
+            if not chassis_id.startswith(LLDPPacket.CHASSIS_ID_PREFIX):
+                raise LLDPPacket.LLDPUnknownFormat(
+                    msg='unknown chassis id format %s' % chassis_id)
+            src_dpid = str_to_dpid(chassis_id[LLDPPacket.CHASSIS_ID_PREFIX_LEN:])
+
+            tlv_port_id = lldp_pkt.tlvs[1]
+            if tlv_port_id.subtype != lldp.PortID.SUB_PORT_COMPONENT:
+                raise LLDPPacket.LLDPUnknownFormat(
+                    msg='unknown port id subtype %d' % tlv_port_id.subtype)
+            port_id = tlv_port_id.port_id
+            if len(port_id) != LLDPPacket.PORT_ID_SIZE:
+                raise LLDPPacket.LLDPUnknownFormat(
+                    msg='unknown port id %d' % port_id)
+            (src_port_no, ) = struct.unpack(LLDPPacket.PORT_ID_STR, port_id)
+
+            tlv_timestamp = lldp_pkt.tlvs[3]
+            timestamp = tlv_timestamp.timestamp
+
+            return src_dpid, src_port_no, timestamp
 
 
 class Switches(app_manager.RyuApp):
@@ -504,7 +517,7 @@ class Switches(app_manager.RyuApp):
                event.EventHostAdd]
 
     DEFAULT_TTL = 120  # unused. ignored.
-    LLDP_PACKET_LEN = len(LLDPPacket.lldp_packet(0, 0, DONTCARE_STR, 0))
+    LLDP_PACKET_LEN = len(LLDPPacket.lldp_packet(0, 0, DONTCARE_STR, 0, 0))
 
     LLDP_SEND_GUARD = .05
     LLDP_SEND_PERIOD_PER_PORT = .9
@@ -569,8 +582,9 @@ class Switches(app_manager.RyuApp):
                     return p
 
     def _port_added(self, port):
-        lldp_data = LLDPPacket.lldp_packet(
-            port.dpid, port.port_no, port.hw_addr, self.DEFAULT_TTL)
+        _time = time.time()
+        lldp_data = LLDPPacket.lldp_packet(port.dpid, port.port_no,
+                                           port.hw_addr, self.DEFAULT_TTL, _time)
         self.ports.add_port(port, lldp_data)
         # LOG.debug('_port_added dpid=%s, port_no=%s, live=%s',
         #           port.dpid, port.port_no, port.is_live())
@@ -717,7 +731,6 @@ class Switches(app_manager.RyuApp):
             # LOG.debug('A port was deleted.' +
             #           '(datapath id = %s, port number = %s)',
             #           dp.id, ofpport.port_no)
-            self.port_state[dp.id].remove(ofpport.port_no)
             self.send_event_to_observers(
                 event.EventPortDelete(Port(dp.id, dp.ofproto, ofpport)))
 
@@ -729,6 +742,8 @@ class Switches(app_manager.RyuApp):
                 self.ports.del_port(port)
                 self._link_down(port)
                 self.lldp_event.set()
+
+            self.port_state[dp.id].remove(ofpport.port_no)
 
         else:
             assert reason == dp.ofproto.OFPPR_MODIFY
@@ -771,7 +786,7 @@ class Switches(app_manager.RyuApp):
 
         msg = ev.msg
         try:
-            src_dpid, src_port_no = LLDPPacket.lldp_parse(msg.data)
+            src_dpid, src_port_no, timestamp = LLDPPacket.lldp_parse(msg.data)
         except LLDPPacket.LLDPUnknownFormat:
             # This handler can receive all the packets which can be
             # not-LLDP packet. Ignore it silently

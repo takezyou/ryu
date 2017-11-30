@@ -78,6 +78,10 @@ LLDP_TLV_SYSTEM_NAME = 5                # System Name
 LLDP_TLV_SYSTEM_DESCRIPTION = 6         # System Description
 LLDP_TLV_SYSTEM_CAPABILITIES = 7        # System Capabilities
 LLDP_TLV_MANAGEMENT_ADDRESS = 8         # Management Address
+LLDP_TLV_DOMAIN_ID = 9                  # Domain id for Open Exchange Protocol
+LLDP_TLV_VPORT_ID = 10                  # vport_no for Open Exchange Protocol
+LLDP_TLV_SEND_TIME = 11                 # Time stamp for sending LLDP packet,
+                                        # using for delay measurement.
 LLDP_TLV_ORGANIZATIONALLY_SPECIFIC = 127  # organizationally Specific TLVs
 
 
@@ -136,11 +140,12 @@ class lldp(packet_base.PacketBase):
     def _tlvs_len_valid(self):
         return len(self.tlvs) >= 4
 
-    # chassis id, port id, ttl and end
+    # chassis id, port id, ttl time and end
     def _tlvs_valid(self):
         return (self.tlvs[0].tlv_type == LLDP_TLV_CHASSIS_ID and
                 self.tlvs[1].tlv_type == LLDP_TLV_PORT_ID and
                 self.tlvs[2].tlv_type == LLDP_TLV_TTL and
+                self.tlvs[3].tlv_type == LLDP_TLV_SEND_TIME and
                 self.tlvs[-1].tlv_type == LLDP_TLV_END)
 
     @classmethod
@@ -610,6 +615,27 @@ class OrganizationallySpecific(LLDPBasicTLV):
     def serialize(self):
         return struct.pack('!H3sB', self.typelen, self.oui,
                            self.subtype) + self.info
+    
+@lldp.set_tlv_type(LLDP_TLV_SEND_TIME)
+class TimeStamp(LLDPBasicTLV):
+    _PACK_STR = '!d'
+    _PACK_SIZE = struct.calcsize(_PACK_STR)
+    _LEN_MIN = _PACK_SIZE
+    _LEN_MAX = _PACK_SIZE
+
+    def __init__(self, buf=None, *args, **kwargs):
+        super(TimeStamp, self).__init__(buf, *args, **kwargs)
+        if buf:
+            (self.timestamp, ) = struct.unpack(
+                self._PACK_STR, self.tlv_info[:self._PACK_SIZE])
+        else:
+            self.timestamp = kwargs['timestamp']
+            self.len = self._PACK_SIZE
+            assert self._len_valid()
+            self.typelen = (self.tlv_type << LLDP_TLV_TYPE_SHIFT) | self.len
+
+    def serialize(self):
+        return struct.pack('!Hd', self.typelen, self.timestamp)
 
 
 lldp.set_classes(lldp._tlv_parsers)
