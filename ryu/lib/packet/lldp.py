@@ -634,7 +634,7 @@ class TimeStamp(LLDPBasicTLV):
             self.typelen = (self.tlv_type << LLDP_TLV_TYPE_SHIFT) | self.len
 
     def serialize(self):
-        return struct.pack('!H1c', self.typelen, self.timestamp)
+        return struct.pack('!H1s', self.typelen, self.timestamp)
 
 
 lldp.set_classes(lldp._tlv_parsers)
